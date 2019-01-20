@@ -126,7 +126,7 @@ namespace WasabiRealFeeCalc
                 var coordinatorFeeParts = tx.Outputs
                     .GroupBy(x => x.Value)
                     .ToDictionary(x => x.Key, x => x.Count())
-                    .Select(x => new { Denomination = x.Key, AnonymitySet = x.Value, Fee = x.Key.Satoshi * ((x.Value * x.Value) * 0.003m * 0.01m) })
+                    .Select(x => new { Denomination = x.Key, AnonymitySet = x.Value, Fee = CalculateCoordinatorFee(x.Key, x.Value) })
                     .Where(x => x.AnonymitySet > 1);
 
                 var coordinatorFeeSatoshis = coordinatorFeeParts.Sum(x => (long)x.Fee);
@@ -142,10 +142,15 @@ namespace WasabiRealFeeCalc
                 total += error;
                 var errorDecimal = error.ToDecimal(MoneyUnit.BTC).ToString("+0.0000000;-0.0000000");
                 Console.WriteLine($"{txid}:  Estimated: {fastEstimatiedFee}  Paid: {paidCoordinatorFee}  Diff: {errorDecimal} ({errorPerc}%)   Accumulated: {total}");
-                await Task.Delay(500);
             }
-            Console.WriteLine($"Total error: {total} btc  --> approx: {total * 3600} USD");
 
+            Console.WriteLine($"Total error: {total} btc  --> approx: {total * 3600} USD");
+        }
+
+        private static decimal CalculateCoordinatorFee(Money denomination, int anonymitySet)
+        {
+            var coordinatorFeePerAlice = denomination.Percentage(anonymitySet * anonymitySet * 0.003m );
+            return coordinatorFeePerAlice.Satoshi;
         }
 
         private static async Task<Transaction> GetTransactionByIdAsync(string txid)
@@ -180,5 +185,13 @@ namespace WasabiRealFeeCalc
                 }
             }
         }
+    }
+
+    static class NBitcoinExtensions
+    {
+		public static Money Percentage(this Money me, decimal perc)
+		{
+			return Money.Satoshis(me.Satoshi * perc * 0.01m );
+		}
     }
 }
